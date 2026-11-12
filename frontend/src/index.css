@@ -1,0 +1,19 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background-color: #0ea5e9;
+  color: white;
+}

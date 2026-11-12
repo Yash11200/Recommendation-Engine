@@ -1,0 +1,50 @@
+# Data (large files - do not commit)
+data/raw/
+data/processed/
+data/embeddings/
+*.zip
+*.parquet
+*.csv
+!frontend/public/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.log
+
+# Models & checkpoints
+*.h5
+*.pb
+*.ckpt*
+saved_models/
+checkpoints/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Airflow / Triton
+airflow/logs/
+airflow/airflow.db
+triton/models/*/1/
+
+# Env
+.env
+*.env
