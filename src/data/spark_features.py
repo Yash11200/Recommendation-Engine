@@ -1,139 +1,92 @@
 """
-spark_features.py
------------------
-Uses PySpark (local mode) to build useful offline features:
-
-1. Item popularity (number of ratings + average rating)
-2. User activity (number of ratings given by each user)
-3. Genre-level statistics
-4. Simple user history length
-
-These features will later feed the ranking model and cold-start logic.
-
-Run after preprocess.py:
-    python -m src.data.spark_features
+spark_features.py (Fast Pandas Alternative)
+-------------------------------------------
+Builds offline item, user, and genre features without requiring a JVM.
 """
 
 from pathlib import Path
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = ROOT / "data" / "processed"
 
 
-def create_spark():
-  """Lightweight local Spark session – good enough for this project size."""
-  spark = (
-    SparkSession.builder
-    .appName("RecSys-FeatureEngineering")
-    .master("local[*]")
-    .config("spark.driver.memory", "4g")
-    .config("spark.sql.shuffle.partitions", "8")
-    .config("spark.ui.showConsoleProgress", "true")
-    .getOrCreate()
-  )
-  spark.sparkContext.setLogLevel("WARN")
-  return spark
-
-
 def main():
   print("=" * 60)
-  print("Spark Feature Engineering")
+  print("Feature Engineering (Fast Pandas Mode)")
   print("=" * 60)
 
-  spark = create_spark()
+  train = pd.read_parquet(PROCESSED_DIR / "train.parquet")
+  movies = pd.read_parquet(PROCESSED_DIR / "movies.parquet")
 
-  # ------------------------------------------------------------------
-  # Load processed data
-  # ------------------------------------------------------------------
-  train_path = str(PROCESSED_DIR / "train.parquet")
-  movies_path = str(PROCESSED_DIR / "movies.parquet")
+  print(f"  Train rows : {len(train):,}")
+  print(f"  Movies     : {len(movies):,}")
 
-  print("Loading train.parquet into Spark...")
-  train = spark.read.parquet(train_path)
-  movies = spark.read.parquet(movies_path)
-
-  print(f"  Train rows : {train.count():,}")
-  print(f"  Movies     : {movies.count():,}")
-
-  # ------------------------------------------------------------------
   # 1. Item popularity features
-  # ------------------------------------------------------------------
   print("\nComputing item popularity...")
   item_stats = (
-    train.groupBy("movieId")
+    train.groupby("movieId", as_index=False)
     .agg(
-      F.count("*").alias("rating_count"),
-      F.avg("rating").alias("avg_rating"),
-      F.stddev("rating").alias("std_rating"),
+      rating_count=("rating", "count"),
+      avg_rating=("rating", "mean"),
+      std_rating=("rating", "std"),
     )
-    .withColumn("log_rating_count", F.log1p("rating_count"))
   )
+  item_stats["std_rating"] = item_stats["std_rating"].fillna(0.0)
+  item_stats["log_rating_count"] = np.log1p(item_stats["rating_count"])
 
-  # ------------------------------------------------------------------
   # 2. User activity features
-  # ------------------------------------------------------------------
   print("Computing user activity...")
   user_stats = (
-    train.groupBy("userId")
+    train.groupby("userId", as_index=False)
     .agg(
-      F.count("*").alias("user_rating_count"),
-      F.avg("rating").alias("user_avg_rating"),
-      F.min("timestamp").alias("first_rating_ts"),
-      F.max("timestamp").alias("last_rating_ts"),
+      user_rating_count=("rating", "count"),
+      user_avg_rating=("rating", "mean"),
+      first_rating_ts=("timestamp", "min"),
+      last_rating_ts=("timestamp", "max"),
     )
-    .withColumn("user_log_count", F.log1p("user_rating_count"))
+  )
+  user_stats["user_log_count"] = np.log1p(user_stats["user_rating_count"])
+  user_stats["user_history_span_sec"] = (
+    user_stats["last_rating_ts"] - user_stats["first_rating_ts"]
   )
 
-  # ------------------------------------------------------------------
-  # 3. Genre explosion + genre popularity (simple)
-  # ------------------------------------------------------------------
+  # 3. Genre popularity features
   print("Computing genre features...")
-  # movies already has genres_list from preprocess (array of strings)
-  movies_exploded = (
-    movies
-    .withColumn("genre", F.explode_outer("genres_list"))
-    .select("movieId", "genre")
-  )
+  if "genres_list" not in movies.columns:
+    movies["genres_list"] = movies["genres"].fillna("(no genres listed)").str.split("|")
 
+  movies_exploded = movies[["movieId", "genres_list"]].explode("genres_list").rename(
+    columns={"genres_list": "genre"}
+  )
   genre_stats = (
-    train.join(movies_exploded, on="movieId", how="inner")
-    .groupBy("genre")
+    train[["movieId", "rating"]]
+    .merge(movies_exploded, on="movieId", how="inner")
+    .groupby("genre", as_index=False)
     .agg(
-      F.count("*").alias("genre_rating_count"),
-      F.avg("rating").alias("genre_avg_rating"),
+      genre_rating_count=("rating", "count"),
+      genre_avg_rating=("rating", "mean"),
     )
   )
 
-  # ------------------------------------------------------------------
-  # 4. Join everything back and write
-  # ------------------------------------------------------------------
+  # 4. Write feature tables
   print("Writing feature tables...")
+  item_stats.to_parquet(PROCESSED_DIR / "item_features.parquet", index=False)
+  user_stats.to_parquet(PROCESSED_DIR / "user_features.parquet", index=False)
+  genre_stats.to_parquet(PROCESSED_DIR / "genre_features.parquet", index=False)
 
-  item_stats.write.mode("overwrite").parquet(str(PROCESSED_DIR / "item_features.parquet"))
-  user_stats.write.mode("overwrite").parquet(str(PROCESSED_DIR / "user_features.parquet"))
-  genre_stats.write.mode("overwrite").parquet(str(PROCESSED_DIR / "genre_features.parquet"))
-
-  # Also create a convenient train + item features view
-  train_enriched = train.join(item_stats, on="movieId", how="left")
-  train_enriched.write.mode("overwrite").parquet(
-    str(PROCESSED_DIR / "train_enriched.parquet")
-  )
+  train_enriched = train.merge(item_stats, on="movieId", how="left")
+  train_enriched.to_parquet(PROCESSED_DIR / "train_enriched.parquet", index=False)
 
   print("\n[OK] Feature tables saved:")
-  print(f"  • item_features.parquet")
-  print(f"  • user_features.parquet")
-  print(f"  • genre_features.parquet")
-  print(f"  • train_enriched.parquet")
+  print("  • item_features.parquet")
+  print("  • user_features.parquet")
+  print("  • genre_features.parquet")
+  print("  • train_enriched.parquet")
 
-  # Quick preview
   print("\nTop 10 most popular movies (by rating count):")
-  item_stats.orderBy(F.desc("rating_count")).show(10, truncate=False)
-
-  spark.stop()
-  print("\nSpark feature engineering finished.")
+  print(item_stats.sort_values("rating_count", ascending=False).head(10).to_string(index=False))
 
 
 if __name__ == "__main__":
