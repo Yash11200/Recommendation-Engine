@@ -1,215 +1,290 @@
 /**
- * App.tsx – Day 1 Attractive UI Skeleton
- * Modern dark theme recommendation interface.
- * Later we will connect real API endpoints.
+ * App.tsx – Enhanced ChatGPT-style UI
+ * with lucide-react icons + framer-motion
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Sun, Moon, Sparkles, Film, Database,
+  Cpu, Search, Layers, Server, RefreshCw,
+  User, AlertCircle
+} from 'lucide-react'
 
-// Mock data for Day 1 visual demo
-const MOCK_MOVIES = [
-  { id: 1, title: 'Inception', year: 2010, genres: 'Sci-Fi | Action', rating: 4.8, poster: '🧠' },
-  { id: 2, title: 'The Dark Knight', year: 2008, genres: 'Action | Crime', rating: 4.9, poster: '🦇' },
-  { id: 3, title: 'Interstellar', year: 2014, genres: 'Sci-Fi | Drama', rating: 4.7, poster: '🌌' },
-  { id: 4, title: 'Parasite', year: 2019, genres: 'Thriller | Drama', rating: 4.6, poster: '🏠' },
-  { id: 5, title: 'Spirited Away', year: 2001, genres: 'Animation | Fantasy', rating: 4.8, poster: '🐉' },
-  { id: 6, title: 'The Matrix', year: 1999, genres: 'Sci-Fi | Action', rating: 4.7, poster: '💊' },
-  { id: 7, title: 'Whiplash', year: 2014, genres: 'Drama | Music', rating: 4.5, poster: '🥁' },
-  { id: 8, title: 'Mad Max: Fury Road', year: 2015, genres: 'Action | Adventure', rating: 4.6, poster: '🔥' },
-]
+interface Movie {
+  movie_id: string
+  title: string
+  genres: string
+}
+
+interface RecommendationResponse {
+  user_id: string
+  recommendations: Movie[]
+  cached: boolean
+  cold_start: boolean
+}
+
+const API_BASE = 'http://localhost:8000'
 
 function App() {
-  const [userId, setUserId] = useState('42')
+  const [userId, setUserId] = useState('9801')
   const [loading, setLoading] = useState(false)
-  const [recommendations, setRecommendations] = useState(MOCK_MOVIES)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<RecommendationResponse | null>(null)
+  const [darkMode, setDarkMode] = useState(true)
 
-  // Placeholder – will call FastAPI later
-  const handleGetRecommendations = () => {
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [darkMode])
+
+  const handleGetRecommendations = async () => {
+    if (!userId.trim()) {
+      setError('Please enter a User ID')
+      return
+    }
+
     setLoading(true)
-    setTimeout(() => {
-      setRecommendations([...MOCK_MOVIES].sort(() => Math.random() - 0.5))
+    setError(null)
+
+    try {
+      const response = await fetch(`${API_BASE}/recommend/${userId.trim()}?top_k=12`)
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
+      const result: RecommendationResponse = await response.json()
+      setData(result)
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch recommendations. Is the API running?')
+      setData(null)
+    } finally {
       setLoading(false)
-    }, 800)
+    }
+  }
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.06 }
+    }
+  }
+
+  const item = {
+    hidden: { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.35 } }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-[#212121] text-gray-100' : 'bg-[#f7f7f8] text-gray-900'}`}>
+
       {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-sky-500/20">
-              R
+      <header className={`border-b sticky top-0 z-50 transition-colors ${darkMode ? 'border-white/10 bg-[#212121]/90 backdrop-blur' : 'border-gray-200 bg-white/90 backdrop-blur'}`}>
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#10a37f] flex items-center justify-center text-white">
+              <Sparkles size={16} />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-white">RecoMind</h1>
-              <p className="text-xs text-slate-400 -mt-0.5">Two-Stage Recommendation Engine</p>
-            </div>
+            <span className="font-medium text-[15px] tracking-tight">RecoMind</span>
           </div>
-          <div className="flex items-center gap-3 text-sm text-slate-400">
-            <span className="hidden sm:inline px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
-              Day 1 • Data Pipeline Ready
+
+          <div className="flex items-center gap-3">
+            <span className={`text-xs hidden sm:block ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Two-Stage Recommendation Engine
             </span>
+
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`p-2 rounded-lg transition ${darkMode ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+              title="Toggle theme"
+            >
+              {darkMode ? <Sun size={18} className="text-gray-300" /> : <Moon size={18} className="text-gray-600" />}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Control Panel */}
-        <section className="mb-12">
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 sm:p-8 shadow-xl shadow-black/20">
-            <div className="flex flex-col lg:flex-row lg:items-end gap-6">
-              <div className="flex-1">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                  Personalized Recommendations
-                </h2>
-                <p className="text-slate-400 max-w-2xl">
-                  Two-stage architecture: fast retrieval with two-tower embeddings + FAISS,
-                  followed by precise deep ranking. Built for the internship project.
-                </p>
-              </div>
+      <main className="max-w-5xl mx-auto px-4 py-10">
+        {/* Hero */}
+        <section className="mb-12 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <h1 className="text-3xl font-semibold tracking-tight mb-3 flex items-center justify-center gap-2">
+              <Film size={28} className="text-[#10a37f]" />
+              Personalized Recommendations
+            </h1>
+            <p className={`text-[15px] max-w-xl mx-auto mb-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Two-tower retrieval + FAISS candidates, followed by neural ranking.
+              Supports cold-start users and Redis caching.
+            </p>
+          </motion.div>
 
-              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    User ID
-                  </label>
-                  <input
-                    type="text"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    className="w-full sm:w-36 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition"
-                    placeholder="e.g. 42"
-                  />
-                </div>
-                <button
-                  onClick={handleGetRecommendations}
-                  disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium shadow-lg shadow-sky-500/25 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[160px]"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Generating...
-                    </>
-                  ) : (
-                    'Get Recommendations'
-                  )}
-                </button>
-              </div>
+          {/* Input */}
+          <motion.div
+            className="max-w-xl mx-auto"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+          >
+            <div className={`flex items-center gap-2 border rounded-2xl px-4 py-3 shadow-sm transition
+              ${darkMode 
+                ? 'bg-[#2f2f2f] border-white/10 focus-within:border-[#10a37f]/50' 
+                : 'bg-white border-gray-200 focus-within:border-[#10a37f]/60 shadow'
+              }`}>
+              <User size={18} className={darkMode ? 'text-gray-500' : 'text-gray-400'} />
+              <input
+                type="text"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGetRecommendations()}
+                placeholder="Enter User ID (e.g. 9801)"
+                className={`flex-1 bg-transparent text-[15px] outline-none ${darkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`}
+              />
+              <button
+                onClick={handleGetRecommendations}
+                disabled={loading}
+                className="bg-[#10a37f] hover:bg-[#0d8c6d] disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-xl transition flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Generating
+                  </>
+                ) : (
+                  <>
+                    <Search size={16} />
+                    Generate
+                  </>
+                )}
+              </button>
             </div>
-          </div>
+          </motion.div>
         </section>
 
-        {/* Pipeline Status */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-          {[
-            { label: 'Dataset', value: 'MovieLens 25M', status: 'ready' },
-            { label: 'Split', value: 'Time-based', status: 'ready' },
-            { label: 'Retrieval', value: 'Two-Tower + FAISS', status: 'pending' },
-            { label: 'Ranking', value: 'Deep Ranker', status: 'pending' },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-xl bg-slate-900/50 border border-slate-800 p-4"
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`max-w-xl mx-auto mb-8 text-sm rounded-xl px-4 py-3 border flex items-center gap-2
+                ${darkMode ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-red-600 bg-red-50 border-red-200'}`}
             >
-              <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-              <p className="text-sm font-medium text-white">{item.value}</p>
-              <div className="mt-2 flex items-center gap-1.5">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    item.status === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'
-                  }`}
-                />
-                <span className="text-xs text-slate-400 capitalize">{item.status}</span>
-              </div>
-            </div>
-          ))}
-        </section>
+              <AlertCircle size={16} />
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Status */}
+        <AnimatePresence>
+          {data && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center gap-3 mb-8"
+            >
+              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Results for user <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{data.user_id}</span>
+              </span>
+              {data.cold_start && (
+                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  Cold Start
+                </span>
+              )}
+              {data.cached && (
+                <span className="text-xs px-2.5 py-1 rounded-full bg-[#10a37f]/10 text-[#10a37f] border border-[#10a37f]/20">
+                  Cached
+                </span>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Recommendations Grid */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">
-              Top Recommendations
-              <span className="ml-2 text-sm font-normal text-slate-400">
-                for user {userId}
-              </span>
-            </h3>
-            <p className="text-xs text-slate-500">Mock data • Real model coming Day 2-3</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {recommendations.map((movie, idx) => (
-              <article
-                key={movie.id}
-                className="group rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden hover:border-sky-500/40 hover:shadow-xl hover:shadow-sky-500/5 transition-all duration-300"
-              >
-                <div className="aspect-[2/3] bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-500">
-                  {movie.poster}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className="font-semibold text-white leading-snug line-clamp-2">
-                      {movie.title}
-                    </h4>
-                    <span className="text-xs font-medium text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-md shrink-0">
+        <AnimatePresence mode="wait">
+          {data && (
+            <motion.section
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              {data.recommendations.map((movie, idx) => (
+                <motion.div
+                  key={movie.movie_id}
+                  variants={item}
+                  className={`group rounded-2xl p-5 transition-all duration-200 border
+                    ${darkMode 
+                      ? 'bg-[#2f2f2f] border-white/5 hover:border-white/10 hover:bg-[#333]' 
+                      : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'
+                    }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <span className={`text-xs font-medium ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                       #{idx + 1}
                     </span>
+                    <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      ID {movie.movie_id}
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-3">
-                    {movie.year} · {movie.genres}
+                  <h3 className={`font-medium text-[15px] leading-snug mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {movie.title}
+                  </h3>
+                  <p className={`text-xs line-clamp-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {movie.genres || 'Unknown genres'}
                   </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-amber-400">
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="text-sm font-medium">{movie.rating}</span>
-                    </div>
-                    <button className="text-xs text-slate-400 hover:text-sky-400 transition">
-                      Details →
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+                </motion.div>
+              ))}
+            </motion.section>
+          )}
+        </AnimatePresence>
 
-        {/* Architecture Teaser */}
-        <section className="mt-16 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:p-8">
-          <h3 className="text-lg font-semibold text-white mb-4">System Architecture (High Level)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-center text-sm">
+        {/* Empty State */}
+        {!data && !loading && !error && (
+          <div className={`text-center py-16 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            Enter a User ID above and click Generate
+          </div>
+        )}
+
+        {/* Pipeline */}
+        <section className={`mt-20 pt-10 border-t ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
+          <h3 className={`text-sm font-medium mb-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            System Pipeline
+          </h3>
+          <div className="flex flex-wrap justify-center gap-3 text-xs">
             {[
-              { title: 'User History', desc: 'Spark features' },
-              { title: 'Two-Tower', desc: 'TF Recommenders' },
-              { title: 'FAISS', desc: 'Candidate retrieval' },
-              { title: 'Ranker', desc: 'Deep scoring' },
-              { title: 'Redis + API', desc: 'Fast serving' },
-            ].map((step, i) => (
-              <div key={step.title} className="relative">
-                <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4 h-full">
-                  <p className="font-medium text-sky-400 mb-1">{step.title}</p>
-                  <p className="text-xs text-slate-400">{step.desc}</p>
-                </div>
-                {i < 4 && (
-                  <div className="hidden md:block absolute top-1/2 -right-2 w-4 h-0.5 bg-slate-700 -translate-y-1/2 z-10" />
-                )}
-              </div>
+              { icon: Database, label: 'Spark Features' },
+              { icon: Cpu, label: 'Two-Tower Model' },
+              { icon: Search, label: 'FAISS Retrieval' },
+              { icon: Layers, label: 'Neural Ranking' },
+              { icon: RefreshCw, label: 'Redis Cache' },
+              { icon: Server, label: 'FastAPI' },
+            ].map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className={`px-3 py-1.5 rounded-full border flex items-center gap-1.5
+                  ${darkMode 
+                    ? 'bg-[#2f2f2f] border-white/5 text-gray-400' 
+                    : 'bg-white border-gray-200 text-gray-500'
+                  }`}
+              >
+                <Icon size={12} />
+                {label}
+              </span>
             ))}
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 mt-16 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
-          Internship Project · Large-Scale Personalized Recommendation Engine · AIML-03
+      <footer className={`border-t mt-16 py-6 ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
+        <div className={`max-w-5xl mx-auto px-4 text-center text-xs ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          Internship Project · Large-Scale Personalized Recommendation Engine
         </div>
       </footer>
     </div>
